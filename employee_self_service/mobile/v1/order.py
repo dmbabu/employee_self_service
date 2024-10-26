@@ -336,7 +336,7 @@ def create_order(*args, **kwargs):
         if not data.get("delivery_date"):
             return gen_response(500, "Please select delivery date to proceed.")
         global_defaults = get_global_defaults()
-        ess_settings = get_ess_settings()
+        # ess_settings = get_ess_settings()
         if data.get("order_id"):
             if not frappe.db.exists("Sales Order", data.get("order_id"), cache=True):
                 return gen_response(500, "Invalid order id.")
@@ -344,7 +344,7 @@ def create_order(*args, **kwargs):
             _create_update_order(
                 data=data,
                 sales_order_doc=sales_order_doc,
-                default_warehouse=ess_settings.get("default_warehouse"),
+                default_warehouse=data.get("set_warehouse"),
             )
             if data.get("attachments") is not None:
                 for file in data.get("attachments"):
@@ -368,7 +368,7 @@ def create_order(*args, **kwargs):
             _create_update_order(
                 data=data,
                 sales_order_doc=sales_order_doc,
-                default_warehouse=ess_settings.get("default_warehouse"),
+                default_warehouse=data.get("set_warehouse"),
             )
             if data.get("attachments") is not None:
                 for file in data.get("attachments"):
