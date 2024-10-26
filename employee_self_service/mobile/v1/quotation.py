@@ -18,6 +18,7 @@ from employee_self_service.mobile.v1.api_utils import (
 from erpnext.accounts.party import get_dashboard_info
 
 from employee_self_service.mobile.v1.ess import download_pdf
+from employee_self_service.mobile.v1.order import get_default_price_list
 
 """order list api for mobile app"""
 
@@ -202,12 +203,15 @@ def get_item_list(filters=None):
         exception_handler(e)
 
 
-def get_items_rate(items):
+def get_items_rate(items,customer=None):
     global_defaults = get_global_defaults()
-    ess_settings = get_ess_settings()
-    price_list = ess_settings.get("default_price_list")
+    price_list = get_default_price_list(customer=customer)
     if not price_list:
-        frappe.throw(_("Please set price list in ess settings."))
+        frappe.throw(
+            _(
+                "Please set a price list for the customer or define a default in the Selling Settings."
+            )
+        )
     for item in items:
         item_price = frappe.get_all(
             "Item Price",
