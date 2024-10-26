@@ -73,6 +73,7 @@ def get_expense_claims():
             )
 
             month_year = get_month_year_details(expense)
+            expense["posting_date"] = expense.get("posting_date").strftime('%d-%m-%Y')
             if not month_year in list(expense_data.keys())[::-1]:
                 expense_data[month_year] = [expense]
             else:

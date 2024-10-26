@@ -100,6 +100,7 @@ def get_order(*args, **kwargs):
             "contact_phone",
             "cost_center",
             "company",
+            "set_warehouse",
         ]:
             order_data[response_field] = order_doc.get(response_field)
         item_list = []
@@ -202,7 +203,7 @@ def get_customer_list(start=0, page_length=10, filters=None):
 
 @frappe.whitelist()
 @ess_validate(methods=["GET"])
-def get_item_list(filters=None):
+def get_item_list(filters=None, customer=None):
     try:
         if not filters:
             filters = []
@@ -210,7 +211,7 @@ def get_item_list(filters=None):
         item_list = frappe.get_list(
             "Item", fields=["name", "item_name", "item_code", "image"], filters=filters
         )
-        items = get_items_rate(item_list)
+        items = get_items_rate(item_list, customer=customer)
         gen_response(200, "Item list get successfully", items)
     except frappe.PermissionError:
         return gen_response(500, "Not permitted for item")
@@ -218,12 +219,15 @@ def get_item_list(filters=None):
         exception_handler(e)
 
 
-def get_items_rate(items):
+def get_items_rate(items, customer=None):
     global_defaults = get_global_defaults()
-    ess_settings = get_ess_settings()
-    price_list = ess_settings.get("default_price_list")
+    price_list = get_default_price_list(customer=customer)
     if not price_list:
-        frappe.throw(_("Please set price list in ess settings."))
+        frappe.throw(
+            _(
+                "Please set a price list for the customer or define a default in the Selling Settings."
+            )
+        )
     for item in items:
         item_price = frappe.get_all(
             "Item Price",
@@ -236,6 +240,23 @@ def get_items_rate(items):
         )
         item["rate"] = item_price[0].price_list_rate if item_price else 0.0
     return items
+
+
+def get_default_price_list(customer=None):
+    if customer:
+        price_list, customer_group = frappe.db.get_value(
+            "Customer", customer, ["default_price_list", "customer_group"]
+        )
+        if price_list:
+            return price_list
+        price_list = frappe.db.get_value(
+            "Customer Group", customer_group, "default_price_list"
+        )
+        if price_list:
+            return price_list
+    return frappe.db.get_value(
+        "Selling Settings", "Selling Settings", "selling_price_list"
+    )
 
 
 @frappe.whitelist()
@@ -390,6 +411,21 @@ def get_item_group_list(filters=None):
             "Item Group", fields=["name"], filters=filters
         )
         gen_response(200, "Item group list get successfully", item_group_list)
+    except frappe.PermissionError:
+        return gen_response(500, "Not permitted for item")
+    except Exception as e:
+        return exception_handler(e)
+
+
+@frappe.whitelist()
+@ess_validate(methods=["GET"])
+def get_warehouse_list(filters=None):
+    try:
+        if not filters:
+            filters = []
+        filters.append(["Warehouse", "is_group", "=", 0])
+        item_group_list = frappe.get_list("Warehouse", fields=["name"], filters=filters)
+        gen_response(200, "Warehouse list get successfully", item_group_list)
     except frappe.PermissionError:
         return gen_response(500, "Not permitted for item")
     except Exception as e:
