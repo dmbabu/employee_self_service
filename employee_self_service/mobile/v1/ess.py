@@ -30,7 +30,7 @@ from employee_self_service.mobile.v1.api_utils import (
     get_global_defaults,
     exception_handler,
     convert_timezone,
-    get_system_timezone
+    get_system_timezone,
 )
 from frappe.handler import upload_file
 from erpnext.accounts.utils import get_fiscal_year
@@ -39,6 +39,7 @@ from employee_self_service.employee_self_service.doctype.push_notification.push_
     create_push_notification,
 )
 from employee_self_service.mobile.v1.approval.workflow import get_workflow_documents
+
 
 @frappe.whitelist(allow_guest=True)
 def login(usr, pwd):
@@ -416,7 +417,7 @@ def get_dashboard():
             "allow_odometer_reading_input": settings.get(
                 "allow_odometer_reading_input"
             ),
-            "approval_requests":None
+            "approval_requests": None,
         }
         # "approval_requests":get_workflow_documents(internal=True)
         dashboard_data["employee_image"] = emp_data.get("image")
@@ -612,7 +613,7 @@ def get_latest_expense(dashboard_data, employee):
                 status=expense_doc.approval_status,
                 date=row.expense_date.strftime("%d-%m-%Y"),
                 expense_type=row.expense_type,
-                description = row.description,
+                description=row.description,
                 # amount=expense_doc.expenses[0].amount,
                 amount=fmt_money(
                     row.amount,
@@ -769,9 +770,9 @@ def get_employees_having_an_event_today(event_type, date=None):
 
 @frappe.whitelist()
 @ess_validate(methods=["GET"])
-def get_task_list(start=0, page_length=10, filters=None,today_task=False):
+def get_task_list(start=0, page_length=10, filters=None, today_task=False):
     try:
-        filters = update_task_filters(filters,today_task)
+        filters = update_task_filters(filters, today_task)
         tasks = frappe.get_list(
             "Task",
             fields=[
@@ -818,12 +819,14 @@ def get_task_list(start=0, page_length=10, filters=None,today_task=False):
     except Exception as e:
         return exception_handler(e)
 
-def update_task_filters(filters,today_task):
-    if isinstance(filters,str):
+
+def update_task_filters(filters, today_task):
+    if isinstance(filters, str):
         filters = json.loads(filters)
     if today_task:
-        filters.append(["Task","exp_end_date","=",today()])
+        filters.append(["Task", "exp_end_date", "=", today()])
     return filters
+
 
 def get_task_assigned_by(task):
     task["assigned_by"] = frappe.db.get_value(
@@ -985,7 +988,7 @@ def get_task_list_dashboard():
                 "exp_end_date",
                 "_assign as assigned_to",
                 "owner as assigned_by",
-                "progress"
+                "progress",
             ],
             filters=filters,
             limit=4,
@@ -2216,9 +2219,9 @@ def get_profile_detail_tabs():
         response["education_details"] = education_details
 
         bank_details = {}
-        bank_details["bank_name"] = emp_doc.get('bank_name') or ""
-        bank_details["bank_ac_no"] = emp_doc.get('bank_ac_no') or ""
-        bank_details["iban"] = emp_doc.get('iban') or ""
+        bank_details["bank_name"] = emp_doc.get("bank_name") or ""
+        bank_details["bank_ac_no"] = emp_doc.get("bank_ac_no") or ""
+        bank_details["iban"] = emp_doc.get("iban") or ""
         response["bank_details"] = bank_details
         return gen_response(200, "Profile Details get successfully", response)
     except Exception as e:

@@ -113,19 +113,16 @@ doctype_js = {"Employee Checkin": "public/js/employee_checkin.js"}
 # 		"on_trash": "method"
 # 	}
 # }
+
 doc_events = {
-    "Leave Application": {
-        "on_update": "employee_self_service.mobile.ess.on_leave_application_update"
-    },
-    "Expense Claim": {
-        "on_submit": "employee_self_service.mobile.ess.on_expense_submit"
-    },
-    "ToDo": {
-        "after_insert": "employee_self_service.mobile.ess.send_notification_for_task_assign"
-    },
-    # "Comment": {
-    #     "after_insert": "employee_self_service.mobile.ess.send_notification_on_task_comment"
-    # },
+    "*": {
+        "before_save":"employee_self_service.send_notification.notification",
+        "after_save":"employee_self_service.send_notification.notification",
+        "on_submit":"employee_self_service.send_notification.notification",
+        "before_cancel":"employee_self_service.send_notification.notification",
+        "after_cancel":"employee_self_service.send_notification.notification",
+        "on_change":"employee_self_service.send_notification.notification"
+    }
 }
 
 # Scheduled Tasks

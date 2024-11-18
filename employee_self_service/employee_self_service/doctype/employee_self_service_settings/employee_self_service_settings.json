@@ -13,8 +13,8 @@
   "default_warehouse",
   "column_break_7qksp",
   "default_print_format",
-  "section_break_sdfg1",
-  "firebase_server_key",
+  "section_break_xjas",
+  "enable_ess_notification",
   "section_break_yu4ls",
   "location_validate",
   "check_in_with_location",
@@ -45,12 +45,6 @@
    "fieldtype": "Link",
    "label": "Default Print Format",
    "options": "Print Format"
-  },
-  {
-   "description": "for the push notification",
-   "fieldname": "firebase_server_key",
-   "fieldtype": "Small Text",
-   "label": "Firebase Server Key"
   },
   {
    "description": "Default warehouse for sales order",
@@ -100,10 +94,6 @@
   {
    "fieldname": "column_break_7qksp",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "section_break_sdfg1",
-   "fieldtype": "Section Break"
   },
   {
    "fieldname": "section_break_yu4ls",
@@ -158,12 +148,22 @@
    "fieldname": "submit_timesheet",
    "fieldtype": "Check",
    "label": "Submit Timesheet"
+  },
+  {
+   "fieldname": "section_break_xjas",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_ess_notification",
+   "fieldtype": "Check",
+   "label": "Enable ESS Notification"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-23 14:54:59.093799",
+ "modified": "2024-11-15 01:52:34.790062",
  "modified_by": "Administrator",
  "module": "Employee Self Service",
  "name": "Employee Self Service Settings",
