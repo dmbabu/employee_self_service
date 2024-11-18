@@ -21,7 +21,8 @@ event_mapping = {
 @frappe.whitelist()
 def notification(doc, event):
     try:
-        notification_processing(doc, event)
+        if frappe.db.exists("DocType","ESS Notification"):
+            notification_processing(doc, event)
     except Exception as e:
         frappe.log_error(title="ESS Notification Trigger Error",message=frappe.get_traceback())
 
