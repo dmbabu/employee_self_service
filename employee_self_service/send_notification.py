@@ -69,6 +69,9 @@ def notification_processing(doc, event):
     event_type = event_mapping.get(event)
     if not event_type:
         return
+    setting = frappe.get_doc("Employee Self Service Settings","Employee Self Service Settings")
+    if not setting.get("enable_ess_notification"):
+        return
     notifications = frappe.get_all(
         "ESS Notification",
         filters={
@@ -80,11 +83,6 @@ def notification_processing(doc, event):
     )
     if not notifications:
         return
-
-    setting = frappe.get_doc("Employee Self Service Settings","Employee Self Service Settings")
-    if not setting.get("enable_ess_notification"):
-        return
-
     recipients = []
     for notification in notifications:
         if notification["condition"]:
@@ -105,10 +103,24 @@ def notification_processing(doc, event):
                         continue
                     else:
                         recipients = get_user_tokens(notification["name"], doc)
-                        send_notification(doc, notification, recipients)
+                        frappe.enqueue(
+                            send_notification,
+                            doc=doc,
+                            notification=notification,
+                            recipients=recipients,
+                            queue="short",
+                            timeout=1000,
+                        )
         else:
             recipients = get_user_tokens(notification["name"], doc)
-            send_notification(doc, notification, recipients)
+            frappe.enqueue(
+                send_notification,
+                doc=doc,
+                notification=notification,
+                recipients=recipients,
+                queue="short",
+                timeout=1000,
+            )
 
 def send_notification(doc, notification, recipients):
     subject = frappe.render_template(notification["subject"], {"doc": doc})

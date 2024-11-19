@@ -252,7 +252,7 @@ def get_items_rate(items, customer=None):
             currency=global_defaults.get("default_currency"),
         )
         item["rate"] = item_price[0].price_list_rate if item_price else 0.0
-        item["price_list_rate"] = item_price[0].price_list_rate
+        item["price_list_rate"] = item_price[0].price_list_rate if item_price else 0.0
         item["price_list_rate_currency"] = fmt_money(
             item_price[0].price_list_rate if item_price else 0.0,
             currency=global_defaults.get("default_currency"),
