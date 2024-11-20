@@ -102,6 +102,8 @@ def get_order(*args, **kwargs):
             "company",
             "set_warehouse",
             "discount_amount",
+            "custom_customer_comment",
+            "territory"
         ]:
             order_data[response_field] = order_doc.get(response_field)
         item_list = []
@@ -451,5 +453,16 @@ def get_warehouse_list(filters=None):
         gen_response(200, "Warehouse list get successfully", item_group_list)
     except frappe.PermissionError:
         return gen_response(500, "Not permitted for item")
+    except Exception as e:
+        return exception_handler(e)
+
+@frappe.whitelist()
+@ess_validate(methods=["GET"])
+def get_territory_list():
+    try:
+        territory_list = frappe.get_all("Territory", fields=["name"])
+        gen_response(200, "Territory list get successfully", territory_list)
+    except frappe.PermissionError:
+        return gen_response(500, "Not permitted for Territory")
     except Exception as e:
         return exception_handler(e)
