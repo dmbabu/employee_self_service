@@ -1,0 +1,40 @@
+{
+ "actions": [],
+ "autoname": "autoincrement",
+ "creation": "2024-11-15 01:27:03.743945",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "receiver_by_document_field",
+  "receiver_by_role"
+ ],
+ "fields": [
+  {
+   "fieldname": "receiver_by_document_field",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Receiver by document field"
+  },
+  {
+   "fieldname": "receiver_by_role",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Receiver By Role",
+   "options": "Role"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-11-15 01:28:16.389723",
+ "modified_by": "Administrator",
+ "module": "Employee Self Service",
+ "name": "ESS Notification Recipient",
+ "naming_rule": "Autoincrement",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

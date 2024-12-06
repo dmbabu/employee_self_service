@@ -100,6 +100,8 @@ def get_order(*args, **kwargs):
             "contact_phone",
             "cost_center",
             "company",
+            "set_warehouse",
+            "discount_amount",
         ]:
             order_data[response_field] = order_doc.get(response_field)
         item_list = []
@@ -109,6 +111,10 @@ def get_order(*args, **kwargs):
             )
             item["rate_currency"] = fmt_money(
                 item.get("rate"), currency=global_defaults.get("default_currency")
+            )
+            item["price_list_rate_currency"] = fmt_money(
+                item.get("price_list_rate"),
+                currency=global_defaults.get("default_currency"),
             )
             item_list.append(
                 prepare_json_data(
@@ -120,6 +126,10 @@ def get_order(*args, **kwargs):
                         "rate",
                         "image",
                         "rate_currency",
+                        "discount_amount",
+                        "discount_percentage",
+                        "price_list_rate",
+                        "price_list_rate_currency",
                     ],
                     item,
                 )
@@ -137,6 +147,11 @@ def get_order(*args, **kwargs):
         )
         order_data["total_unpaid"] = fmt_money(
             dashboard_info[0].get("total_unpaid") if dashboard_info else 0.0,
+            currency=global_defaults.get("default_currency"),
+        )
+        order_data["discount"] = order_data["discount_amount"]
+        order_data["discount_amount"] = fmt_money(
+            order_data["discount_amount"] if order_data["discount_amount"] else 0.0,
             currency=global_defaults.get("default_currency"),
         )
         order_data["attachments"] = get_attachments(data.get("order_id"))
@@ -202,7 +217,7 @@ def get_customer_list(start=0, page_length=10, filters=None):
 
 @frappe.whitelist()
 @ess_validate(methods=["GET"])
-def get_item_list(filters=None):
+def get_item_list(filters=None, customer=None):
     try:
         if not filters:
             filters = []
@@ -210,7 +225,7 @@ def get_item_list(filters=None):
         item_list = frappe.get_list(
             "Item", fields=["name", "item_name", "item_code", "image"], filters=filters
         )
-        items = get_items_rate(item_list)
+        items = get_items_rate(item_list, customer=customer)
         gen_response(200, "Item list get successfully", items)
     except frappe.PermissionError:
         return gen_response(500, "Not permitted for item")
@@ -218,12 +233,15 @@ def get_item_list(filters=None):
         exception_handler(e)
 
 
-def get_items_rate(items):
+def get_items_rate(items, customer=None):
     global_defaults = get_global_defaults()
-    ess_settings = get_ess_settings()
-    price_list = ess_settings.get("default_price_list")
+    price_list = get_default_price_list(customer=customer)
     if not price_list:
-        frappe.throw(_("Please set price list in ess settings."))
+        frappe.throw(
+            _(
+                "Please set a price list for the customer or define a default in the Selling Settings."
+            )
+        )
     for item in items:
         item_price = frappe.get_all(
             "Item Price",
@@ -235,7 +253,29 @@ def get_items_rate(items):
             currency=global_defaults.get("default_currency"),
         )
         item["rate"] = item_price[0].price_list_rate if item_price else 0.0
+        item["price_list_rate"] = item_price[0].price_list_rate if item_price else 0.0
+        item["price_list_rate_currency"] = fmt_money(
+            item_price[0].price_list_rate if item_price else 0.0,
+            currency=global_defaults.get("default_currency"),
+        )
     return items
+
+
+def get_default_price_list(customer=None):
+    if customer:
+        price_list, customer_group = frappe.db.get_value(
+            "Customer", customer, ["default_price_list", "customer_group"]
+        )
+        if price_list:
+            return price_list
+        price_list = frappe.db.get_value(
+            "Customer Group", customer_group, "default_price_list"
+        )
+        if price_list:
+            return price_list
+    return frappe.db.get_value(
+        "Selling Settings", "Selling Settings", "selling_price_list"
+    )
 
 
 @frappe.whitelist()
@@ -274,6 +314,8 @@ def prepare_order_totals(*args, **kwargs):
             dict(doctype="Sales Order", company=global_defaults.get("default_company"))
         )
         sales_order_doc.update(data)
+        sales_order_doc.apply_discount_on = "Grand Total"
+
         sales_order_doc.run_method("set_missing_values")
         sales_order_doc.run_method("calculate_taxes_and_totals")
         sales_order_doc = json.loads(sales_order_doc.as_json())
@@ -295,6 +337,7 @@ def get_order_details_with_currency(sales_order_doc, currency):
         "net_total",
         "discount_amount",
         "grand_total",
+        "total",
     ]:
         order_response_dict[response_fields] = fmt_money(
             sales_order_doc.get(response_fields),
@@ -315,7 +358,7 @@ def create_order(*args, **kwargs):
         if not data.get("delivery_date"):
             return gen_response(500, "Please select delivery date to proceed.")
         global_defaults = get_global_defaults()
-        ess_settings = get_ess_settings()
+        # ess_settings = get_ess_settings()
         if data.get("order_id"):
             if not frappe.db.exists("Sales Order", data.get("order_id"), cache=True):
                 return gen_response(500, "Invalid order id.")
@@ -323,7 +366,7 @@ def create_order(*args, **kwargs):
             _create_update_order(
                 data=data,
                 sales_order_doc=sales_order_doc,
-                default_warehouse=ess_settings.get("default_warehouse"),
+                default_warehouse=data.get("set_warehouse"),
             )
             if data.get("attachments") is not None:
                 for file in data.get("attachments"):
@@ -347,7 +390,7 @@ def create_order(*args, **kwargs):
             _create_update_order(
                 data=data,
                 sales_order_doc=sales_order_doc,
-                default_warehouse=ess_settings.get("default_warehouse"),
+                default_warehouse=data.get("set_warehouse"),
             )
             if data.get("attachments") is not None:
                 for file in data.get("attachments"):
@@ -373,6 +416,7 @@ def _create_update_order(data, sales_order_doc, default_warehouse):
     for item in data.get("items"):
         item["delivery_date"] = delivery_date
         item["warehouse"] = default_warehouse
+    sales_order_doc.apply_discount_on = "Grand Total"
     sales_order_doc.update(data)
     sales_order_doc.run_method("set_missing_values")
     sales_order_doc.run_method("calculate_taxes_and_totals")
@@ -390,6 +434,21 @@ def get_item_group_list(filters=None):
             "Item Group", fields=["name"], filters=filters
         )
         gen_response(200, "Item group list get successfully", item_group_list)
+    except frappe.PermissionError:
+        return gen_response(500, "Not permitted for item")
+    except Exception as e:
+        return exception_handler(e)
+
+
+@frappe.whitelist()
+@ess_validate(methods=["GET"])
+def get_warehouse_list(filters=None):
+    try:
+        if not filters:
+            filters = []
+        filters.append(["Warehouse", "is_group", "=", 0])
+        item_group_list = frappe.get_list("Warehouse", fields=["name"], filters=filters)
+        gen_response(200, "Warehouse list get successfully", item_group_list)
     except frappe.PermissionError:
         return gen_response(500, "Not permitted for item")
     except Exception as e:

@@ -18,6 +18,7 @@ from employee_self_service.mobile.v1.api_utils import (
 from erpnext.accounts.party import get_dashboard_info
 
 from employee_self_service.mobile.v1.ess import download_pdf
+from employee_self_service.mobile.v1.order import get_default_price_list
 
 """order list api for mobile app"""
 
@@ -83,6 +84,7 @@ def get_quotation(*args, **kwargs):
             "contact_mobile",
             "company",
             "terms",
+            "discount_amount",
         ]:
             quotation_data[response_field] = quotation_doc.get(response_field)
         item_list = []
@@ -92,6 +94,10 @@ def get_quotation(*args, **kwargs):
             )
             item["rate_currency"] = fmt_money(
                 item.get("rate"), currency=global_defaults.get("default_currency")
+            )
+            item["price_list_rate_currency"] = fmt_money(
+                item.get("price_list_rate"),
+                currency=global_defaults.get("default_currency"),
             )
             item_list.append(
                 prepare_json_data(
@@ -103,6 +109,10 @@ def get_quotation(*args, **kwargs):
                         "rate",
                         "image",
                         "rate_currency",
+                        "discount_amount",
+                        "discount_percentage",
+                        "price_list_rate",
+                        "price_list_rate_currency",
                     ],
                     item,
                 )
@@ -121,6 +131,15 @@ def get_quotation(*args, **kwargs):
         )
         quotation_data["total_unpaid"] = fmt_money(
             dashboard_info[0].get("total_unpaid") if dashboard_info else 0.0,
+            currency=global_defaults.get("default_currency"),
+        )
+        quotation_data["discount"] = quotation_data["discount_amount"]
+        quotation_data["discount_amount"] = fmt_money(
+            (
+                quotation_data["discount_amount"]
+                if quotation_data["discount_amount"]
+                else 0.0
+            ),
             currency=global_defaults.get("default_currency"),
         )
         quotation_data["attachments"] = get_attachments(data.get("id"))
@@ -202,12 +221,15 @@ def get_item_list(filters=None):
         exception_handler(e)
 
 
-def get_items_rate(items):
+def get_items_rate(items, customer=None):
     global_defaults = get_global_defaults()
-    ess_settings = get_ess_settings()
-    price_list = ess_settings.get("default_price_list")
+    price_list = get_default_price_list(customer=customer)
     if not price_list:
-        frappe.throw(_("Please set price list in ess settings."))
+        frappe.throw(
+            _(
+                "Please set a price list for the customer or define a default in the Selling Settings."
+            )
+        )
     for item in items:
         item_price = frappe.get_all(
             "Item Price",
@@ -219,6 +241,11 @@ def get_items_rate(items):
             currency=global_defaults.get("default_currency"),
         )
         item["rate"] = item_price[0].price_list_rate if item_price else 0.0
+        item["price_list_rate"] = item_price[0].price_list_rate
+        item["price_list_rate_currency"] = fmt_money(
+            item_price[0].price_list_rate if item_price else 0.0,
+            currency=global_defaults.get("default_currency"),
+        )
     return items
 
 
@@ -250,14 +277,22 @@ def prepare_quotation_totals(*args, **kwargs):
         if not data.get("customer"):
             return gen_response(500, "Customer is required.")
         ess_settings = get_ess_settings()
+        # total_discount = 0
         for item in data.get("items"):
             item["valid_till"] = data.get("valid_till")
             item["warehouse"] = ess_settings.get("default_warehouse")
+            # if item["discount_amount"]:
+            #     total_discount = total_discount + (
+            #         float(item["discount_amount"]) * item["qty"]
+            #     )
+
         global_defaults = get_global_defaults()
         sales_order_doc = frappe.get_doc(
             dict(doctype="Quotation", company=global_defaults.get("default_company"))
         )
         sales_order_doc.update(data)
+        # sales_order_doc.discount_amount = total_discount
+        sales_order_doc.apply_discount_on = "Grand Total"
         sales_order_doc.run_method("set_missing_values")
         sales_order_doc.run_method("calculate_taxes_and_totals")
         sales_order_doc = json.loads(sales_order_doc.as_json())
@@ -279,6 +314,7 @@ def get_order_details_with_currency(sales_order_doc, currency):
         "net_total",
         "discount_amount",
         "grand_total",
+        "total",
     ]:
         order_response_dict[response_fields] = fmt_money(
             sales_order_doc.get(response_fields),
@@ -352,10 +388,17 @@ def create_quotation(*args, **kwargs):
 
 def _create_update_quotation(data, quotation_doc, default_warehouse):
     valid_till = data.get("valid_till")
+    # total_discount = 0
     for item in data.get("items"):
         item["valid_till"] = valid_till
         item["warehouse"] = default_warehouse
+        # if item["discount_amount"]:
+        #     total_discount = total_discount + (
+        #         float(item["discount_amount"]) * item["qty"]
+        #     )
     quotation_doc.update(data)
+    # quotation_doc.discount_amount = total_discount
+    quotation_doc.apply_discount_on = "Grand Total"
     # quotation_doc.run_method("set_missing_values")
     quotation_doc.run_method("calculate_taxes_and_totals")
     quotation_doc.save()

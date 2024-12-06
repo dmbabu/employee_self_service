@@ -18,9 +18,9 @@ def gen_response(status, message, data=[]):
 def exception_handler(e):
     frappe.log_error(title="ESS Mobile App Error", message=frappe.get_traceback())
     if hasattr(e, "http_status_code"):
-        return gen_response(e.http_status_code, cstr(e))
+        return gen_response(e.http_status_code, BeautifulSoup(str(e)).get_text())
     else:
-        return gen_response(500, cstr(e))
+        return gen_response(500, BeautifulSoup(str(e)).get_text())
 
 
 def generate_key(user):

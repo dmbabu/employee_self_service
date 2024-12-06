@@ -164,7 +164,7 @@ def get_leave_balance_report(employee, company, fiscal_year):
     year_end_date = get_date_str(fiscal_year.get("year_end_date"))
     filters_leave_balance = {
         "from_date": year_start_date,
-        "to_date": year_end_date,
+        "to_date": today(),
         "company": company,
         "employee": employee,
     }

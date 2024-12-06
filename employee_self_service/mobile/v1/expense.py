@@ -73,6 +73,7 @@ def get_expense_claims():
             )
 
             month_year = get_month_year_details(expense)
+            expense["posting_date"] = expense.get("posting_date").strftime('%d-%m-%Y')
             if not month_year in list(expense_data.keys())[::-1]:
                 expense_data[month_year] = [expense]
             else:
@@ -82,6 +83,57 @@ def get_expense_claims():
     except Exception as e:
         return exception_handler(e)
 
+# Expense Claims List
+@frappe.whitelist()
+@ess_validate(methods=["GET"])
+def get_expense_claims_list():
+    try:
+        global_defaults = get_global_defaults()
+        emp_data = get_employee_by_user(frappe.session.user)
+        if not len(emp_data) >= 1:
+            return gen_response(500, "Employee does not exists")
+        validate_employee_data(emp_data)
+        filters = frappe._dict()
+        filters.employee = emp_data.get("name")
+        fields = [
+            "`tabExpense Claim`.name",
+            "`tabExpense Claim`.employee",
+            "`tabExpense Claim`.employee_name",
+            "`tabExpense Claim`.approval_status",
+            "`tabExpense Claim`.status",
+            "`tabExpense Claim`.expense_approver",
+            "`tabExpense Claim`.total_claimed_amount",
+            "`tabExpense Claim`.posting_date",
+            "`tabExpense Claim`.company",
+            "`tabExpense Claim Detail`.expense_type",
+            "`tabExpense Claim Detail`.description",
+            "count(`tabExpense Claim Detail`.expense_type) as total_expenses",
+        ]
+
+        claims = frappe.get_list(
+            "Expense Claim",
+            fields=fields,
+            filters=filters,
+            order_by="`tabExpense Claim`.posting_date desc",
+            group_by="`tabExpense Claim`.name",
+        )
+        expense_data = {
+            "pending":[],
+            "other":[]
+        }
+        for expense in claims:
+            expense["total_claimed_amount"] = fmt_money(
+                expense["total_claimed_amount"],
+                currency=global_defaults.get("default_currency"),
+            )
+            if expense.get("status") == "Draft":
+                expense_data.get("pending").append(expense)
+            else:
+                expense_data.get("other").append(expense)
+
+        return gen_response(200, "Expense data get successfully", expense_data)
+    except Exception as e:
+        return exception_handler(e)
 
 # Helper to get month wise details
 def get_month_year_details(expense):

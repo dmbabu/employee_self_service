@@ -30,7 +30,7 @@ from employee_self_service.mobile.v1.api_utils import (
     get_global_defaults,
     exception_handler,
     convert_timezone,
-    get_system_timezone
+    get_system_timezone,
 )
 from frappe.handler import upload_file
 from erpnext.accounts.utils import get_fiscal_year
@@ -38,6 +38,7 @@ from erpnext.accounts.utils import get_fiscal_year
 from employee_self_service.employee_self_service.doctype.push_notification.push_notification import (
     create_push_notification,
 )
+from employee_self_service.mobile.v1.approval.workflow import get_workflow_documents
 
 
 @frappe.whitelist(allow_guest=True)
@@ -55,6 +56,8 @@ def login(usr, pwd):
         gen_response(200, frappe.response["message"])
     except frappe.AuthenticationError:
         gen_response(500, frappe.response["message"])
+    except frappe.SecurityException:
+        gen_response(401, frappe.response["message"])
     except Exception as e:
         return exception_handler(e)
 
@@ -416,7 +419,9 @@ def get_dashboard():
             "allow_odometer_reading_input": settings.get(
                 "allow_odometer_reading_input"
             ),
+            "approval_requests": get_workflow_documents(internal=True)
         }
+        # "approval_requests": get_workflow_documents(internal=True)
         dashboard_data["employee_image"] = emp_data.get("image")
         dashboard_data["employee_name"] = emp_data.get("employee_name")
         get_latest_expense(dashboard_data, emp_data.get("name"))
@@ -605,17 +610,19 @@ def get_latest_expense(dashboard_data, employee):
     )
     if len(expense_list) >= 1:
         expense_doc = frappe.get_doc("Expense Claim", expense_list[0].name)
-        dashboard_data["latest_expense"] = dict(
-            status=expense_doc.approval_status,
-            date=expense_doc.expenses[0].expense_date.strftime("%d-%m-%Y"),
-            expense_type=expense_doc.expenses[0].expense_type,
-            # amount=expense_doc.expenses[0].amount,
-            amount=fmt_money(
-                expense_doc.expenses[0].amount,
-                currency=global_defaults.get("default_currency"),
-            ),
-            name=expense_doc.name,
-        )
+        for row in expense_doc.expenses:
+            dashboard_data["latest_expense"] = dict(
+                status=expense_doc.approval_status,
+                date=row.expense_date.strftime("%d-%m-%Y"),
+                expense_type=row.expense_type,
+                description=row.description,
+                # amount=expense_doc.expenses[0].amount,
+                amount=fmt_money(
+                    row.amount,
+                    currency=global_defaults.get("default_currency"),
+                ),
+                name=expense_doc.name,
+            )
 
 
 def get_latest_ss(dashboard_data, employee):
@@ -765,8 +772,9 @@ def get_employees_having_an_event_today(event_type, date=None):
 
 @frappe.whitelist()
 @ess_validate(methods=["GET"])
-def get_task_list(start=0, page_length=10, filters=None):
+def get_task_list(start=0, page_length=10, filters=None, today_task=False):
     try:
+        filters = update_task_filters(filters, today_task)
         tasks = frappe.get_list(
             "Task",
             fields=[
@@ -790,7 +798,7 @@ def get_task_list(start=0, page_length=10, filters=None):
         for task in tasks:
             # if frappe.session.user == task.get("assigned_by") or frappe.session.user == task.get("completed_by") or (task.get("assigned_to") and frappe.session.user in task.get("assigned_to")):
             if task["exp_end_date"]:
-                task["exp_end_date"] = task["exp_end_date"].strftime("%d-%m-%Y")
+                task["exp_end_date"] = task["exp_end_date"].strftime("%d %b %Y")
             get_task_comments(task)
             task["project_name"] = frappe.db.get_value(
                 "Project", {"name": task.get("project")}, ["project_name"]
@@ -812,6 +820,14 @@ def get_task_list(start=0, page_length=10, filters=None):
         return gen_response(200, "Task list getting Successfully", tasks)
     except Exception as e:
         return exception_handler(e)
+
+
+def update_task_filters(filters, today_task):
+    if isinstance(filters, str):
+        filters = json.loads(filters)
+    if today_task:
+        filters.append(["Task", "exp_end_date", "=", today()])
+    return filters
 
 
 def get_task_assigned_by(task):
@@ -974,13 +990,14 @@ def get_task_list_dashboard():
                 "exp_end_date",
                 "_assign as assigned_to",
                 "owner as assigned_by",
+                "progress",
             ],
             filters=filters,
             limit=4,
         )
         for task in tasks:
             if task["exp_end_date"]:
-                task["exp_end_date"] = task["exp_end_date"].strftime("%d-%m-%Y")
+                task["exp_end_date"] = task["exp_end_date"].strftime("%d %b %Y")
             comments = frappe.get_all(
                 "Comment",
                 filters={
@@ -2204,9 +2221,9 @@ def get_profile_detail_tabs():
         response["education_details"] = education_details
 
         bank_details = {}
-        bank_details["bank_name"] = emp_doc.get('bank_name') or ""
-        bank_details["bank_ac_no"] = emp_doc.get('bank_ac_no') or ""
-        bank_details["iban"] = emp_doc.get('iban') or ""
+        bank_details["bank_name"] = emp_doc.get("bank_name") or ""
+        bank_details["bank_ac_no"] = emp_doc.get("bank_ac_no") or ""
+        bank_details["iban"] = emp_doc.get("iban") or ""
         response["bank_details"] = bank_details
         return gen_response(200, "Profile Details get successfully", response)
     except Exception as e:
